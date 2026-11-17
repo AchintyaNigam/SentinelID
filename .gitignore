@@ -1,0 +1,17 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Environment secrets
+.env
+.env.*
+!.env.example

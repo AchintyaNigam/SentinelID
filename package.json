@@ -1,0 +1,13 @@
+{
+  "name": "sentinelid",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}
