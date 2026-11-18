@@ -17,3 +17,13 @@ output "issuer" {
   description = "Cognito JWT issuer"
   value       = module.cognito.issuer
 }
+
+output "session_table_name" {
+  description = "DynamoDB session table name"
+  value       = module.sessions.table_name
+}
+
+output "session_table_arn" {
+  description = "DynamoDB session table ARN"
+  value       = module.sessions.table_arn
+}

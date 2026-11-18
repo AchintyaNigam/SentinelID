@@ -86,8 +86,8 @@ resource "aws_cognito_user_pool_client" "web" {
 }
 
 resource "aws_cognito_user_pool_domain" "sentinelid" {
-  domain              = var.domain_prefix
-  user_pool_id        = aws_cognito_user_pool.sentinelid.id
+  domain                = var.domain_prefix
+  user_pool_id          = aws_cognito_user_pool.sentinelid.id
   managed_login_version = 2
 }
 
