@@ -12,3 +12,10 @@ module "sessions" {
   project_name = "sentinelid"
   environment  = "dev"
 }
+
+module "documents" {
+  source = "../../modules/documents"
+
+  project_name = "sentinelid"
+  environment  = "dev"
+}

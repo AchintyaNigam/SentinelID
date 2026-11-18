@@ -27,3 +27,24 @@ output "session_table_arn" {
   description = "DynamoDB session table ARN"
   value       = module.sessions.table_arn
 }
+
+output "documents_table_name" {
+  value = module.documents.documents_table_name
+}
+
+output "documents_table_arn" {
+  value = module.documents.documents_table_arn
+}
+
+output "documents_table_owner_index_arn" {
+  value = module.documents.documents_table_owner_index_arn
+}
+
+output "documents_bucket_name" {
+  value = module.documents.documents_bucket_name
+}
+
+output "documents_bucket_arn" {
+  value = module.documents.documents_bucket_arn
+}
+

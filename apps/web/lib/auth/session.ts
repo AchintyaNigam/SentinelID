@@ -3,35 +3,24 @@ import 'server-only';
 
 import { createHash, randomBytes } from 'node:crypto';
 
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DeleteCommand,
-  DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
+
+import { docClient } from '../aws/dynamodb';
 
 import { CompactEncrypt, compactDecrypt } from 'jose';
 
 const SESSION_COOKIE_MAX_AGE = 24 * 60 * 60;
 
 const TABLE_NAME = process.env.DYNAMODB_SESSION_TABLE;
-const REGION = process.env.AWS_REGION ?? 'eu-west-1';
 
 if (!TABLE_NAME) {
   throw new Error('Missing DYNAMODB_SESSION_TABLE environment variable.');
 }
-
-const dynamoClient = new DynamoDBClient({
-  region: REGION,
-});
-
-const docClient = DynamoDBDocumentClient.from(dynamoClient, {
-  marshallOptions: {
-    removeUndefinedValues: true,
-  },
-});
 
 export interface CognitoTokenSet {
   accessToken: string;
