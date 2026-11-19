@@ -99,3 +99,16 @@ export function assertDocumentAccess(
   }
 }
 
+/**
+ * Determines whether a user can list documents belonging to everyone.
+ *
+ * Admin and Analyst can list all documents.
+ * Employee can only list documents they own.
+ */
+export function canListAllDocuments(
+  user: AuthenticatedUser,
+): boolean {
+  return getUserRoles(user).some(
+    (role) => role === 'Admin' || role === 'Analyst',
+  );
+}

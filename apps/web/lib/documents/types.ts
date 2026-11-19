@@ -16,6 +16,7 @@ export interface DocumentRecord {
  * never from request data supplied by the client.
  */
 export interface CreateDocumentInput {
+  document_id?: string;
   file_name: string;
   s3_key: string;
   content_type: string;

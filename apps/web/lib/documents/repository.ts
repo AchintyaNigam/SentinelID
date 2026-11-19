@@ -1,4 +1,3 @@
-
 import 'server-only';
 
 import { randomUUID } from 'node:crypto';
@@ -8,9 +7,15 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
+  ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
 
 import { docClient } from '../aws/dynamodb';
+import type { QueryCommandInput } from '@aws-sdk/lib-dynamodb';
+
+export type DocumentCursor = NonNullable<
+  QueryCommandInput['ExclusiveStartKey']
+>;
 
 import type {
   CreateDocumentInput,
@@ -56,7 +61,7 @@ export async function getDocumentsByOwner(
   ownerId: string,
   options: {
     limit?: number;
-    exclusiveStartKey?: Record<string, string | number>;
+    exclusiveStartKey?: DocumentCursor;
   } = {},
 ) {
   const limit = Math.min(
@@ -94,16 +99,16 @@ export async function createDocument(
   ownerId: string,
   input: CreateDocumentInput,
 ): Promise<DocumentRecord> {
-  const now = Math.floor(Date.now() / 1000);
+  const documentId = input.document_id ?? randomUUID();
 
   const document: DocumentRecord = {
-    document_id: randomUUID(),
+    document_id: documentId,
     owner_id: ownerId,
     file_name: input.file_name,
     s3_key: input.s3_key,
     content_type: input.content_type,
     file_size: input.file_size,
-    created_at: now,
+    created_at: Math.floor(Date.now() / 1000),
   };
 
   await docClient.send(
@@ -116,7 +121,6 @@ export async function createDocument(
 
   return document;
 }
-
 /**
  * Deletes a document metadata record.
  *
@@ -136,3 +140,33 @@ export async function deleteDocumentRecord(
   );
 }
 
+/**
+ * Retrieves documents across the entire table.
+ *
+ * Intended for Admin and Analyst users only.
+ * The caller must enforce authorisation before invoking this.
+ */
+export async function getAllDocuments(
+  options: {
+    limit?: number;
+    exclusiveStartKey?: DocumentCursor;
+  } = {},
+) {
+  const limit = Math.min(
+    Math.max(options.limit ?? 20, 1),
+    100,
+  );
+
+  const response = await docClient.send(
+    new ScanCommand({
+      TableName: TABLE_NAME,
+      Limit: limit,
+      ExclusiveStartKey: options.exclusiveStartKey,
+    }),
+  );
+
+  return {
+    documents: (response.Items ?? []) as DocumentRecord[],
+    lastEvaluatedKey: response.LastEvaluatedKey,
+  };
+}

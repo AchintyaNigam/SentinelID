@@ -1,4 +1,3 @@
-
 resource "aws_dynamodb_table" "documents" {
   name         = "${var.project_name}-${var.environment}-documents"
   billing_mode = "PAY_PER_REQUEST"
@@ -105,5 +104,22 @@ resource "aws_s3_bucket_policy" "documents" {
   depends_on = [
     aws_s3_bucket_public_access_block.documents
   ]
+}
+
+resource "aws_s3_bucket_cors_configuration" "documents" {
+  bucket = aws_s3_bucket.documents.id
+
+  cors_rule {
+    allowed_headers = [
+      "Content-Type",
+      "If-None-Match",
+      "x-amz-meta-*",
+    ]
+
+    allowed_methods = ["PUT"]
+    allowed_origins = ["http://localhost:3000"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
 }
 
