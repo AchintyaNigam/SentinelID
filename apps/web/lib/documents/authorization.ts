@@ -1,4 +1,3 @@
-
 import 'server-only';
 
 import type { AuthenticatedUser } from '../auth/require-auth';
@@ -59,8 +58,8 @@ export function canAccessDocument(
   if (action === 'delete') {
     return roles.some(
       (role) =>
-        role === 'Admin' ||
-        ((role === 'Analyst' || role === 'Employee') && isOwner),
+        roleHasPermission(role, 'documents:delete') &&
+        (role === 'Admin' || isOwner),
     );
   }
 
@@ -91,7 +90,7 @@ export class DocumentNotFoundError extends Error {
 
 export function assertDocumentAccess(
   user: AuthenticatedUser,
-  document: DocumentRecord | undefined,
+  document: DocumentRecord | undefined | null,
   action: DocumentAction,
 ): asserts document is DocumentRecord {
   if (!document || !canAccessDocument(user, document, action)) {

@@ -1,4 +1,3 @@
-
 import * as client from 'openid-client';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,14 +24,14 @@ function clearSessionCookie(response: NextResponse): NextResponse {
 
 export async function POST(request: NextRequest) {
   // Require a same-origin browser request to protect this state-changing route.
-const origin = request.headers.get('origin');
-
-if (!origin) {
-  return NextResponse.json(
-    { error: 'Invalid request origin.' },
-    { status: 403 },
-  );
-}
+  const origin = request.headers.get('origin');
+  
+  if (origin !== request.nextUrl.origin) {
+    return NextResponse.json(
+      { error: 'Invalid request origin.' },
+      { status: 403 },
+    );
+  }
 
   const cognitoDomain = process.env.COGNITO_DOMAIN;
   const clientId = process.env.COGNITO_CLIENT_ID;
@@ -99,8 +98,10 @@ if (!origin) {
     console.warn('Logout completed locally; Cognito revocation needs investigation.');
   }
 
-  const response = NextResponse.redirect(cognitoLogoutUrl);
-
+  const response = NextResponse.redirect(cognitoLogoutUrl, {
+    status: 303,
+  });
+  
   return clearSessionCookie(response);
 }
 

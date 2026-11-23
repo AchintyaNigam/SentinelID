@@ -1,4 +1,3 @@
-
 import type { UserRole } from './require-role';
 
 export const PERMISSIONS = [
@@ -6,6 +5,7 @@ export const PERMISSIONS = [
   'users:manage',
   'documents:read',
   'documents:upload',
+  'documents:delete',
   'audit:read',
   'profile:read',
 ] as const;
@@ -18,18 +18,21 @@ export const ROLE_PERMISSIONS = {
     'users:manage',
     'documents:read',
     'documents:upload',
+    'documents:delete',
     'audit:read',
     'profile:read',
   ],
   Analyst: [
     'documents:read',
     'documents:upload',
+    'documents:delete',
     'audit:read',
     'profile:read',
   ],
   Employee: [
     'documents:read',
     'documents:upload',
+    'documents:delete',
     'profile:read',
   ],
 } as const satisfies Record<UserRole, readonly Permission[]>;
