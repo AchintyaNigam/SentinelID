@@ -3,8 +3,19 @@ import { HeadObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 
 import {
+  requireAuth,
   UnauthenticatedError,
 } from '@/lib/auth/require-auth';
+
+import type {
+  AuthenticatedUser,
+} from '@/lib/auth/require-auth';
+
+import { recordAuditEvent } from '@/lib/audit/service';
+
+import type {
+  CreateAuditEventInput,
+} from '@/lib/audit/types';
 
 import {
   ForbiddenError,
@@ -37,6 +48,21 @@ const paramsSchema = z.object({
   documentId: z.string().uuid(),
 });
 
+async function writeAuditEventSafely(
+  event: CreateAuditEventInput,
+): Promise<void> {
+  try {
+    await recordAuditEvent(event);
+  } catch (error) {
+    console.error('Audit event persistence failed.', {
+      action: event.action,
+      resourceId: event.resource_id,
+      errorName:
+        error instanceof Error ? error.name : 'UnknownError',
+    });
+  }
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ documentId: string }> },
@@ -44,9 +70,11 @@ export async function POST(
   let s3Key: string | undefined;
   let shouldDeleteObject = false;
   let documentId: string | undefined;
+  let actor: AuthenticatedUser | undefined;
   try {
     // 1. Authenticate and check upload permission.
     const user = await requirePermission('documents:upload');
+    actor = user;
 
     // 2. Validate the document ID.
     const params = await context.params;
@@ -76,6 +104,17 @@ export async function POST(
       metadata['document-id'] !== documentId ||
       metadata['owner-id'] !== user.sub
     ) {
+        await writeAuditEventSafely({
+          actor_id: user.sub,
+          actor_roles: user.groups,
+          action: 'DOCUMENT_UPLOAD',
+          resource_type: 'DOCUMENT',
+          resource_id: documentId,
+          outcome: 'DENIED',
+          details: {
+            reason_code: 'UPLOAD_OWNERSHIP_MISMATCH',
+          },
+        });      
       return NextResponse.json(
         { error: 'Upload not found or not accessible.' },
         { status: 404 },
@@ -114,6 +153,17 @@ export async function POST(
       ) ||
       Math.floor(Date.now() / 1000) > uploadExpiresAt
     ) {
+      await writeAuditEventSafely({
+        actor_id: user.sub,
+        actor_roles: user.groups,
+        action: 'DOCUMENT_UPLOAD',
+        resource_type: 'DOCUMENT',
+        resource_id: documentId,
+        outcome: 'FAILURE',
+        details: {
+          reason_code: 'UPLOAD_VALIDATION_FAILED',
+        },
+      });
       await s3Client.send(
         new DeleteObjectCommand({
           Bucket: DOCUMENTS_BUCKET,
@@ -133,6 +183,17 @@ export async function POST(
 
     if (existingDocument) {
       if (existingDocument.owner_id !== user.sub) {
+        await writeAuditEventSafely({
+          actor_id: user.sub,
+          actor_roles: user.groups,
+          action: 'DOCUMENT_UPLOAD',
+          resource_type: 'DOCUMENT',
+          resource_id: existingDocument.document_id,
+          outcome: 'DENIED',
+          details: {
+            reason_code: 'DOCUMENT_OWNERSHIP_MISMATCH',
+          },
+        });
         return NextResponse.json(
           { error: 'Upload not found or not accessible.' },
           { status: 404 },
@@ -140,6 +201,19 @@ export async function POST(
       }
     
       shouldDeleteObject = false;
+      await writeAuditEventSafely({
+        actor_id: user.sub,
+        actor_roles: user.groups,
+        action: 'DOCUMENT_UPLOAD',
+        resource_type: 'DOCUMENT',
+        resource_id: existingDocument.document_id,
+        outcome: 'SUCCESS',
+        details: {
+          content_type: existingDocument.content_type,
+          file_size: existingDocument.file_size,
+          reason_code: 'IDEMPOTENT_COMPLETION',
+        }
+      });
     
       return NextResponse.json(
         {
@@ -163,6 +237,18 @@ export async function POST(
       content_type: contentType,
       file_size: fileSize,
     });
+    await writeAuditEventSafely({
+      actor_id: user.sub,
+      actor_roles: user.groups,
+      action: 'DOCUMENT_UPLOAD',
+      resource_type: 'DOCUMENT',
+      resource_id: document.document_id,
+      outcome: 'SUCCESS',
+      details: {
+        content_type: document.content_type,
+        file_size: document.file_size,
+      },
+    });
 
     shouldDeleteObject = false;
 
@@ -181,6 +267,17 @@ export async function POST(
     );
   } catch (error) {
     if (error instanceof UnauthenticatedError) {
+      await writeAuditEventSafely({
+        actor_roles: [],
+        action: 'DOCUMENT_UPLOAD',
+        resource_type: 'DOCUMENT',
+        resource_id: documentId,
+        outcome: 'DENIED',
+        details: {
+          reason_code: 'UNAUTHENTICATED',
+        },
+      });
+    
       return NextResponse.json(
         { error: 'Authentication required.' },
         { status: 401 },
@@ -188,12 +285,42 @@ export async function POST(
     }
 
     if (error instanceof ForbiddenError) {
+      if (!actor) {
+        try {
+          actor = await requireAuth();
+        } catch {
+          // Identity could not be established.
+        }
+      }
+    
+      await writeAuditEventSafely({
+        ...(actor ? { actor_id: actor.sub } : {}),
+        actor_roles: actor?.groups ?? [],
+        action: 'DOCUMENT_UPLOAD',
+        resource_type: 'DOCUMENT',
+        resource_id: documentId,
+        outcome: 'DENIED',
+        details: {
+          reason_code: 'INSUFFICIENT_PERMISSION',
+        },
+      });
+    
       return NextResponse.json(
         { error: 'You do not have permission to upload documents.' },
         { status: 403 },
       );
     }
-
+    await writeAuditEventSafely({
+      ...(actor ? { actor_id: actor.sub } : {}),
+      actor_roles: actor?.groups ?? [],
+      action: 'DOCUMENT_UPLOAD',
+      resource_type: 'DOCUMENT',
+      resource_id: documentId,
+      outcome: 'FAILURE',
+      details: {
+        reason_code: 'UPLOAD_COMPLETION_FAILED',
+      },
+    });  
     // Clean up an object that we verified belongs to this user
     // if metadata registration failed.
     if (shouldDeleteObject && s3Key && documentId) {
@@ -202,6 +329,7 @@ export async function POST(
 
        // Never delete an S3 object that has a registered document record.
        if (!existingDocument) {
+      
          await s3Client.send(
            new DeleteObjectCommand({
              Bucket: DOCUMENTS_BUCKET,

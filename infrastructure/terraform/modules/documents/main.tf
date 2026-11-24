@@ -19,14 +19,14 @@ resource "aws_dynamodb_table" "documents" {
   }
 
   global_secondary_index {
-    name = "owner-created-index"
+    name            = "owner-created-index"
     projection_type = "ALL"
-  
+
     key_schema {
       attribute_name = "owner_id"
       key_type       = "HASH"
     }
-  
+
     key_schema {
       attribute_name = "created_at"
       key_type       = "RANGE"

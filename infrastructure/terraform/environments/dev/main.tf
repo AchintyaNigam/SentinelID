@@ -19,3 +19,10 @@ module "documents" {
   project_name = "sentinelid"
   environment  = "dev"
 }
+
+module "audit_events" {
+  source = "../../modules/audit-events"
+
+  project_name = "sentinelid"
+  environment  = "dev"
+}

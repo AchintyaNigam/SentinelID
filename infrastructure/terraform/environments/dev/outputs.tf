@@ -48,3 +48,13 @@ output "documents_bucket_arn" {
   value = module.documents.documents_bucket_arn
 }
 
+output "audit_events_table_name" {
+  description = "DynamoDB audit events table name"
+  value       = module.audit_events.table_name
+}
+
+output "audit_events_table_arn" {
+  description = "DynamoDB audit events table ARN"
+  value       = module.audit_events.table_arn
+}
+
